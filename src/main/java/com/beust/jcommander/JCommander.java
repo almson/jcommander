@@ -1242,6 +1242,10 @@ public class JCommander {
     Class<? extends IStringConverter<?>> converterClass = annotation.converter();
     boolean listConverterWasSpecified = annotation.listConverter() != NoConverter.class;
 
+    if (listConverterWasSpecified) {
+        converterClass = annotation.listConverter();
+    }
+    
     //
     // Try to find a converter on the annotation
     //
@@ -1264,13 +1268,23 @@ public class JCommander {
         converterClass = (Class<? extends IStringConverter<?>>) elementType;
       }
     }
+    
+    if (converterClass == null) {
+      throw new ParameterException("Don't know how to convert " + value
+          + " to type " + type + " (field: " + parameterized.getName() + ")");
+    }
 
     IStringConverter<?> converter;
     Object result = null;
     try {
       String[] names = annotation.names();
       String optionName = names.length > 0 ? names[0] : "[Main class]";
-      if (converterClass != null && converterClass.isEnum()) {
+      // What the hell is this?!
+      // Why is a value of type Class<Enum> stored in Class<? extends IStringConverter<?>>?
+      // What kind of a programmer wrote this?!
+      // This is Java, not JavaScript or C
+      // Declare an EnumConverter and return it in findConverter()
+      if (converterClass.isEnum()) {
         try {
           result = Enum.valueOf((Class<? extends Enum>) converterClass, value);
         } catch (IllegalArgumentException e) {
@@ -1291,11 +1305,7 @@ public class JCommander {
 
           // The field is a List
           if (listConverterWasSpecified) {
-            // If a list converter was specified, pass the value to it
-            // for direct conversion
-            IStringConverter<?> listConverter =
-                instantiateConverter(optionName, annotation.listConverter());
-            result = listConverter.convert(value);
+            result = converter.convert(value);
           } else {
             // No list converter: use the single value converter and pass each
             // parsed value to it individually
